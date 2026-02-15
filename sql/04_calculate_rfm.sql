@@ -1,5 +1,10 @@
 WITH cleaned AS (
-    SELECT *
+    SELECT 
+        customer_id,
+        invoice,
+        CAST(invoice_date AS TIMESTAMP) as invoice_date,
+        quantity,
+        price
     FROM public.retail_records
     WHERE quantity > 0
       AND price > 0
@@ -8,7 +13,7 @@ WITH cleaned AS (
 rfm_base AS (
     SELECT
         customer_id,
-        MAX(invoicedate) AS last_purchase_date,
+        MAX(invoice_date) AS last_purchase_date,
         COUNT(DISTINCT invoice) AS frequency,
         SUM(quantity * price) AS monetary
     FROM cleaned
