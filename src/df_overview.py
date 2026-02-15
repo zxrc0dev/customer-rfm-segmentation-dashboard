@@ -1,6 +1,6 @@
 import pandas as pd
 
-def df_info(df):
+def df_overview(df):
     print(f"{'='*30} Head {'='*30}")
     print(df.head())
     print(f"{'='*30} Tail {'='*30}")
