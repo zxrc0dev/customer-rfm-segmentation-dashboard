@@ -17,3 +17,6 @@ def df_info(df):
     print(df.isnull().sum())
     print(f"{'='*30} Duplicates {'='*30}")
     print(df.duplicated().sum())
+    print(f"{'='*30} Cardinality & Top Values {'='*30}")
+    for c in df.select_dtypes(include='object').columns:
+        print(c, df[c].nunique(), df[c].value_counts(normalize=True).head())
