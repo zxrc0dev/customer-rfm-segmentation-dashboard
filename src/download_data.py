@@ -4,16 +4,24 @@ import kagglehub
 
 from pathlib import Path
 
-def download_data():
-    cache_path = Path(
-        kagglehub.dataset_download(
-            "mashlyn/online-retail-ii-uci",
-            force_download=True
-        )
-    )
 
-    project_dir = Path("../data/01_raw")
+def download_data(path: str, force: bool = False):
+    """Download a Kaggle dataset to data/01_raw/.
+
+    Skips the download if the target directory already contains files,
+    unless *force* is True.
+    """
+    project_dir = Path(__file__).resolve().parents[1] / "data" / "01_raw"
     project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Skip download when data already exists (and force is off)
+    if not force and any(project_dir.iterdir()):
+        print(f"Data already present in {project_dir}, skipping download.")
+        return
+
+    cache_path = Path(
+        kagglehub.dataset_download(path, force_download=force)
+    )
 
     if cache_path.suffix == ".zip":
         with zipfile.ZipFile(cache_path, "r") as z:

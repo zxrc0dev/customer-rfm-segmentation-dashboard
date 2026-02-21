@@ -1,0 +1,23 @@
+# Core data science
+numpy>=2.0,<3
+pandas>=2.0,<3
+
+# Visualisation
+matplotlib>=3.8,<4
+seaborn>=0.13,<1
+missingno>=0.5,<1
+
+# Machine learning
+scikit-learn>=1.5,<2
+
+# Model persistence
+joblib>=1.3,<2
+
+# Data acquisition
+kagglehub>=1.0,<2
+
+# Jupyter runtime (required to execute the notebooks)
+jupyter>=1.1,<2
+ipykernel>=6.29,<7
+
+-e .

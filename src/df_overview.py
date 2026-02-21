@@ -1,10 +1,6 @@
 import pandas as pd
 
 def df_overview(df):
-    print(f"{'='*33} Head {'='*33}")
-    print(df.head())
-    print(f"{'='*33} Tail {'='*33}")
-    print(df.tail())
     print(f"{'='*33} Shape {'='*33}")
     print(df.shape)
     print(f"{'='*33} Info {'='*33}")
