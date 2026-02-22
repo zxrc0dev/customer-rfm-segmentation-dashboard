@@ -1,7 +1,7 @@
 # Core data science
 numpy>=2.0,<3
 pandas>=2.0,<3
-
+psycopg2-binary>=2.9,<3
 # Visualisation
 matplotlib>=3.8,<4
 seaborn>=0.13,<1
