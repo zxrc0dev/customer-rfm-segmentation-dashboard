@@ -98,34 +98,7 @@ def feature_engineering_sql(engine: URL, table_name: str, table_name_rfm: str):
         FROM sales_returns
     ),
 
-    /* 7) Average interpurchase days */
-    invoice_events AS (
-        SELECT DISTINCT
-            customer_id,
-            invoice,
-            invoice_date
-        FROM base
-    ),
-
-    invoice_diffs AS (
-        SELECT
-            customer_id,
-            EXTRACT(EPOCH FROM (invoice_date - LAG(invoice_date) OVER (
-                PARTITION BY customer_id ORDER BY invoice_date
-            ))) / 86400.0 AS delta_days
-        FROM invoice_events
-    ),
-
-    avg_interpurchase AS (
-        SELECT
-            customer_id,
-            AVG(delta_days) AS avg_interpurchase_days
-        FROM invoice_diffs
-        WHERE delta_days IS NOT NULL
-        GROUP BY customer_id
-    ),
-
-    /* 8) Average order value */
+    /* 7) Average order value */
     aov AS (
         SELECT
             customer_id,
@@ -138,7 +111,6 @@ def feature_engineering_sql(engine: URL, table_name: str, table_name_rfm: str):
 
     SELECT
         seg.customer_id,
-        seg.last_purchase_date,
         seg.recency,
         seg.frequency,
         seg.monetary,
@@ -148,13 +120,10 @@ def feature_engineering_sql(engine: URL, table_name: str, table_name_rfm: str):
         seg.r_f_score,
         seg.segment,
         rr.return_ratio,
-        ai.avg_interpurchase_days,
         a.avg_order_value
     FROM segmented seg
     LEFT JOIN return_ratio rr
         ON rr.customer_id = seg.customer_id
-    LEFT JOIN avg_interpurchase ai
-        ON ai.customer_id = seg.customer_id
     LEFT JOIN aov a
         ON a.customer_id = seg.customer_id
     ;
@@ -162,8 +131,8 @@ def feature_engineering_sql(engine: URL, table_name: str, table_name_rfm: str):
 
     with engine.connect() as conn:
         conn.execute(text(feature_engineering_query))
-        conn.commit()  # important for DDL in many SQLAlchemy setups
-        print(f"Feature engineering table public.{table_name_rfm} created successfully.")
+        conn.commit()
+        print(f"Featured table public.{table_name_rfm} created successfully.")
     
 
 def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
@@ -181,29 +150,33 @@ def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
         'revenue': 'monetary'
     }, inplace=True)
 
+    # Sort by customer_id as tiebreaker to match SQL's NTILE(...ORDER BY ..., customer_id)
+    df_rfm = df_rfm.sort_values(["recency", "customer_id"], ascending=[True, True])
     df_rfm["recency_score"] = pd.qcut(
-        df_rfm["recency"], 
-        5, 
-        labels=[5,4,3,2,1]
+        df_rfm["recency"].rank(method="first", ascending=True),
+        5,
+        labels=[5, 4, 3, 2, 1]
     )
 
+    df_rfm = df_rfm.sort_values(["frequency", "customer_id"], ascending=[True, True])
     df_rfm["frequency_score"] = pd.qcut(
-        df_rfm["frequency"].rank(method="first"), 
-        5, 
-        labels=[1,2,3,4,5]
+        df_rfm["frequency"].rank(method="first", ascending=True),
+        5,
+        labels=[1, 2, 3, 4, 5]
     )
 
+    df_rfm = df_rfm.sort_values(["monetary", "customer_id"], ascending=[True, True])
     df_rfm["monetary_score"] = pd.qcut(
-        df_rfm["monetary"], 
-        5, 
-        labels=[1,2,3,4,5]
+        df_rfm["monetary"].rank(method="first", ascending=True),
+        5,
+        labels=[1, 2, 3, 4, 5]
     )
 
     df_rfm["recency_score"] = df_rfm["recency_score"].astype(int)
     df_rfm["frequency_score"] = df_rfm["frequency_score"].astype(int)
     df_rfm["monetary_score"] = df_rfm["monetary_score"].astype(int)
 
-    df_rfm["R_F_Score"] = df_rfm["recency_score"].astype(str) + df_rfm["frequency_score"].astype(str)
+    df_rfm["r_f_score"] = df_rfm["recency_score"].astype(str) + df_rfm["frequency_score"].astype(str)
 
     seg_map = {
         r'[1-2][1-2]': 'hibernating',
@@ -218,7 +191,7 @@ def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
         r'5[4-5]': 'champions'
     }
 
-    df_rfm["segment"] = df_rfm["R_F_Score"].replace(seg_map, regex = True)
+    df_rfm["segment"] = df_rfm["r_f_score"].replace(seg_map, regex = True)
 
     df['sales_only'] = df['revenue'].clip(lower=0)
     df['returns_only'] = df['revenue'].clip(upper=0).abs()
@@ -238,6 +211,8 @@ def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
     inv = (df.dropna(subset=["customer_id"])
             .drop_duplicates(subset=["customer_id", "invoice"])
             .sort_values(["customer_id", "invoice_date"]))
+    '''
+    Unused features
 
     avg_interpurchase = (inv.groupby("customer_id")["invoice_date"]
                         .diff()
@@ -247,7 +222,7 @@ def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
                         .rename("avg_interpurchase_days"))
     
     df_rfm = df_rfm.merge(avg_interpurchase, left_index=True, right_index=True, how="left")
-    """ 
+
     purchase_date = df.groupby("customer_id")["invoice_date"].min() 
 
     customer_tenure = (
@@ -259,7 +234,7 @@ def feature_engineering_pandas(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     df_rfm = df_rfm.merge(customer_tenure, left_index=True, right_index=True, how="left")
-    """
+    '''
     avg_order_value = (
         df.groupby("customer_id")
         .agg(total_revenue=("revenue", "sum"),
